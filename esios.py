@@ -74,6 +74,8 @@ class Esios:
             inds_dict = {}
 
             for indicator in indicators_list:
+
                 df = Esios.get_indicator(self, indicator, start_date, end_date)
                 inds_dict[indicator] = df
+
             return inds_dict
