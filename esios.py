@@ -1,6 +1,7 @@
 import pandas as pd
 import requests
 import datetime
+import time
 from functools import reduce
 
 
@@ -79,7 +80,7 @@ class Esios:
     def get_several_indicators(self,
                                indicators_list: list,
                                start_date: datetime,
-                               end_date: datetime) -> dict:
+                               end_date: datetime) -> pd.DataFrame:
         """
         Returns information for several indicators if they have similar structure i.e. granularity,
         country, region, etc
@@ -101,8 +102,10 @@ class Esios:
             inds_dict = {}
 
             for indicator in indicators_list:
-
+                t0 = time.time()
                 df = Esios.get_indicator(self, indicator, start_date, end_date)
+                t1 = time.time()
+                print(f"Downloaded indicator {indicator}: {t1 - t0:.0f} s ")
                 inds_dict[indicator] = df
 
-        return inds_dict
+        return self.convert_to_df(inds_dict)
