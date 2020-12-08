@@ -7,7 +7,7 @@ from functools import reduce
 
 class Esios:
     """
-    Creates class with which download data from esios API (Spanish TSO)
+    Creates class with which to download data from esios API (Spanish TSO)
     """
 
     def __init__(self, token):
@@ -24,27 +24,28 @@ class Esios:
             'Cookie': ''
         }
 
-        self.datetime_fmt = "%Y-%m-%d %H:%M%:%S"
-        self.geo_ids = [3, 8741]
-
     @staticmethod
-    def convert_to_df(dict_dfs: dict):
+    def _convert_to_df(dfs_list: dict):
         """
         converts dictionary of dataframes into a single, merged dataframe
         """
-        # renames columns to include the indicator number in the columns
-        for ind, df in dict_dfs.items():
-            df.rename(columns={"value": f"ind_{ind}"}, inplace=True)
-
-        dfs = [
-            df[["datetime"] + [col for col in df.columns if "ind" in col]] 
-            for df in dict_dfs.values()
-        ]
+        # renames columns and appends df to list
+        dfs = []
+        for dict_ind in dfs_list:
+            df = dict_ind["dataframe"]
+            ind = dict_ind["indicator"]
+            name = dict_ind["name"]
+            df.rename(
+                columns={"value": f"{ind}_{name}"},
+                inplace=True
+            )
+            dfs.append(df)
 
         return reduce(lambda left, right: pd.merge(left, right, on="datetime"), dfs)
 
     def get_indicator(
         self,
+        name: str,
         indicator: int,
         start_date: datetime.datetime,
         end_date: datetime.datetime
@@ -60,16 +61,17 @@ class Esios:
         param = {'start_date': start_date, 'end_date': end_date, 'time_trunc': 'hour'}
         url = 'https://api.esios.ree.es/indicators/' + str(indicator)
 
-        raw_data = requests.get(url,
-                                headers=self.header,
-                                params=param)
+        raw_data = requests.get(
+            url,
+            headers=self.header,
+            params=param
+        )
         data_to_json = raw_data.json()['indicator']['values']
 
         df_raw = pd.DataFrame(data_to_json)
-        df_raw.rename(columns={"value": f"ind_{indicator}"}, inplace=True)
 
         if len(df_raw["geo_name"].unique()) > 1:
-            if "ind_600" in df_raw.columns:
+            if "España" in df_raw["geo_name"].unique():
                 df_raw = df_raw.query("geo_name == 'España'").reset_index(drop=True)
             else:
                 df_raw = (
@@ -79,11 +81,11 @@ class Esios:
                     .reset_index()
                 )
 
-        return df_raw[["datetime"] + [col for col in df_raw.columns if "ind" in col]]
+        return df_raw[["datetime", "value"]]
 
     def get_several_indicators(
         self,
-        indicators_dict: list,
+        indicators_dict: dict,
         start_date: datetime,
         end_date: datetime
     ):
@@ -95,23 +97,20 @@ class Esios:
         :param end_date:
         :return:
         """
-        # if there's only one indicator in the list
-        if len(indicators_dict) == 1:
 
-            indicator = indicators_dict.values()[0]
-            df = Esios.get_indicator(self, indicator, start_date, end_date)
-            inds_dict =  {indicator: df}
+        dfs_list = []
 
-        else:
+        for name, indicator in indicators_dict.items():
+            
+            t0 = time.time()
+            df = Esios.get_indicator(self, name, indicator, start_date, end_date)
+            t1 = time.time()
+            print(f"Downloaded indicator `{name}`: {t1 - t0:.0f} s ")
+            
+            dfs_list.append({
+                "name": name,
+                "indicator": indicator,
+                "dataframe": df,
+            })
 
-            # loop through indicators
-            inds_dict = {}
-
-            for name, indicator in indicators_dict.items(dict):
-                t0 = time.time()
-                df = Esios.get_indicator(self, indicator, start_date, end_date)
-                t1 = time.time()
-                print(f"Downloaded indicator {name}: {t1 - t0:.0f} s ")
-                inds_dict[indicator] = df
-
-        return self.convert_to_df(inds_dict)
+        return self._convert_to_df(dfs_list)
