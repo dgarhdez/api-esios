@@ -28,7 +28,7 @@ class Esios:
         self.geo_ids = [3, 8741]
 
     @staticmethod
-    def convert_to_df(dict_dfs: dict) -> pd.DataFrame:
+    def convert_to_df(dict_dfs: dict):
         """
         converts dictionary of dataframes into a single, merged dataframe
         """
@@ -36,15 +36,19 @@ class Esios:
         for ind, df in dict_dfs.items():
             df.rename(columns={"value": f"ind_{ind}"}, inplace=True)
 
-        dfs = [df[["datetime"] + [col for col in df.columns if "ind" in col]] for df in
-               dict_dfs.values()]
+        dfs = [
+            df[["datetime"] + [col for col in df.columns if "ind" in col]] 
+            for df in dict_dfs.values()
+        ]
 
         return reduce(lambda left, right: pd.merge(left, right, on="datetime"), dfs)
 
-    def get_indicator(self,
-                      indicator: int,
-                      start_date: datetime.datetime,
-                      end_date: datetime.datetime) -> pd.DataFrame:
+    def get_indicator(
+        self,
+        indicator: int,
+        start_date: datetime.datetime,
+        end_date: datetime.datetime
+    ):
         """
         Gets data as pd.DataFrame between the chosen dates and for the chosen indicators
         :param indicator:
@@ -77,10 +81,12 @@ class Esios:
 
         return df_raw[["datetime"] + [col for col in df_raw.columns if "ind" in col]]
 
-    def get_several_indicators(self,
-                               indicators_list: list,
-                               start_date: datetime,
-                               end_date: datetime) -> pd.DataFrame:
+    def get_several_indicators(
+        self,
+        indicators_dict: list,
+        start_date: datetime,
+        end_date: datetime
+    ):
         """
         Returns information for several indicators if they have similar structure i.e. granularity,
         country, region, etc
@@ -90,9 +96,9 @@ class Esios:
         :return:
         """
         # if there's only one indicator in the list
-        if len(indicators_list) == 1:
+        if len(indicators_dict) == 1:
 
-            indicator = indicators_list[0]
+            indicator = indicators_dict.values()[0]
             df = Esios.get_indicator(self, indicator, start_date, end_date)
             inds_dict =  {indicator: df}
 
@@ -101,11 +107,11 @@ class Esios:
             # loop through indicators
             inds_dict = {}
 
-            for indicator in indicators_list:
+            for name, indicator in indicators_dict.items(dict):
                 t0 = time.time()
                 df = Esios.get_indicator(self, indicator, start_date, end_date)
                 t1 = time.time()
-                print(f"Downloaded indicator {indicator}: {t1 - t0:.0f} s ")
+                print(f"Downloaded indicator {name}: {t1 - t0:.0f} s ")
                 inds_dict[indicator] = df
 
         return self.convert_to_df(inds_dict)
